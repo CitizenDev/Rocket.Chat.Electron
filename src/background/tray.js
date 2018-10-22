@@ -1,4 +1,4 @@
-import { app, systemPreferences, Menu, Tray as TrayIcon } from 'electron';
+import { systemPreferences, Menu, Tray as TrayIcon } from 'electron';
 import { EventEmitter } from 'events';
 import path from 'path';
 import i18n from '../i18n/index.js';
@@ -17,7 +17,7 @@ const getTrayIconFileNameSuffix = ({ badge: { title, count, showAlert } }) => {
 	}
 };
 
-const getTrayIconPath = (state) => {
+const getTrayIconImage = (state) => {
 	const iconDir = {
 		win32: 'windows',
 		linux: 'linux',
@@ -88,8 +88,12 @@ class Tray extends EventEmitter {
 	}
 
 	createTrayIcon() {
-		this.trayIcon = new TrayIcon(getTrayIconPath(this.state));
-		this.trayIcon.setToolTip(app.getName());
+		if (this.trayIcon) {
+			return;
+		}
+
+		this.trayIcon = new TrayIcon(getTrayIconImage(this.state));
+		this.trayIcon.setToolTip(getTrayIconTooltip(this.state));
 
 		this.trayIcon.on('click', () => this.emit('set-main-window-visibility', !this.state.isMainWindowVisible));
 		this.trayIcon.on('right-click', (event, bounds) => this.trayIcon.popUpContextMenu(undefined, bounds));
@@ -126,13 +130,13 @@ class Tray extends EventEmitter {
 			return;
 		}
 
+		this.trayIcon.setImage(getTrayIconImage(this.state));
+
 		if (process.platform === 'darwin') {
 			this.trayIcon.setTitle(getTrayIconTitle(this.state));
 		}
-		
-		this.trayIcon.setToolTip(getTrayIconTooltip(this.state));
 
-		this.trayIcon.setImage(getTrayIconPath(this.state));
+		this.trayIcon.setToolTip(getTrayIconTooltip(this.state));
 
 		const template = createContextMenuTemplate(this.state, this);
 		const menu = Menu.buildFromTemplate(template);
