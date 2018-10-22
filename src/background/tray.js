@@ -1,31 +1,6 @@
-import { systemPreferences, Menu, Tray as TrayIcon } from 'electron';
+import { nativeImage, systemPreferences, Menu, Tray as TrayIcon } from 'electron';
 import { EventEmitter } from 'events';
-import path from 'path';
 import i18n from '../i18n/index.js';
-
-const getTrayIconFileNameSuffix = ({ badge: { title, count, showAlert } }) => {
-	if (title === '•') {
-		return 'dot';
-	} else if (count > 9) {
-		return '9plus';
-	} else if (count > 0) {
-		return String(count);
-	} else if (showAlert) {
-		return 'alert';
-	} else {
-		return 'Template';
-	}
-};
-
-const getTrayIconImage = (state) => {
-	const iconDir = {
-		win32: 'windows',
-		linux: 'linux',
-		darwin: 'osx',
-	}[process.platform];
-	const fileName = `icon-tray-${ getTrayIconFileNameSuffix(state) }.${ process.platform === 'win32' ? 'ico' : 'png' }`;
-	return path.join(__dirname, 'public', 'images', iconDir, fileName);
-};
 
 const getTrayIconTitle = ({ badge: { title, count, showAlert }, status, showUserStatus }) => {
 	// TODO: remove status icon from title, since ANSI codes disable title color's adaptiveness
@@ -77,6 +52,8 @@ class Tray extends EventEmitter {
 		};
 
 		this.trayIcon = null;
+
+		this.images = {};
 	}
 
 	setState(partialState) {
@@ -87,12 +64,34 @@ class Tray extends EventEmitter {
 		this.update();
 	}
 
+	getIconImage() {
+		const { title, count, showAlert } = this.state.badge;
+
+		if (title === '•') {
+			return this.images.dot;
+		}
+
+		if (count > 0) {
+			return this.images[count > 9 ? '9plus' : String(count)];
+		}
+
+		if (showAlert) {
+			return this.images.alert;
+		}
+
+		return this.images[process.platform === 'darwin' ? 'template' : 'normal'];
+	}
+
+	setIconImage(name, dataUrl) {
+		this.images[name] = nativeImage.createFromDataURL(dataUrl);
+	}
+
 	createTrayIcon() {
 		if (this.trayIcon) {
 			return;
 		}
 
-		this.trayIcon = new TrayIcon(getTrayIconImage(this.state));
+		this.trayIcon = new TrayIcon(this.getIconImage());
 		this.trayIcon.setToolTip(getTrayIconTooltip(this.state));
 
 		this.trayIcon.on('click', () => this.emit('set-main-window-visibility', !this.state.isMainWindowVisible));
@@ -130,7 +129,7 @@ class Tray extends EventEmitter {
 			return;
 		}
 
-		this.trayIcon.setImage(getTrayIconImage(this.state));
+		this.trayIcon.setImage(this.getIconImage());
 
 		if (process.platform === 'darwin') {
 			this.trayIcon.setTitle(getTrayIconTitle(this.state));
