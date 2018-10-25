@@ -1,31 +1,6 @@
-import { app, systemPreferences, Menu, Tray as TrayIcon } from 'electron';
+import { nativeImage, systemPreferences, Menu, Tray as TrayIcon } from 'electron';
 import { EventEmitter } from 'events';
-import path from 'path';
 import i18n from '../i18n/index.js';
-
-const getTrayIconFileNameSuffix = ({ badge: { title, count, showAlert } }) => {
-	if (title === '•') {
-		return 'dot';
-	} else if (count > 9) {
-		return '9plus';
-	} else if (count > 0) {
-		return String(count);
-	} else if (showAlert) {
-		return 'alert';
-	} else {
-		return 'Template';
-	}
-};
-
-const getTrayIconPath = (state) => {
-	const iconDir = {
-		win32: 'windows',
-		linux: 'linux',
-		darwin: 'osx',
-	}[process.platform];
-	const fileName = `icon-tray-${ getTrayIconFileNameSuffix(state) }.${ process.platform === 'win32' ? 'ico' : 'png' }`;
-	return path.join(__dirname, 'public', 'images', iconDir, fileName);
-};
 
 const getTrayIconTitle = ({ badge: { title, count, showAlert }, status, showUserStatus }) => {
 	// TODO: remove status icon from title, since ANSI codes disable title color's adaptiveness
@@ -46,6 +21,8 @@ const getTrayIconTitle = ({ badge: { title, count, showAlert }, status, showUser
 
 	return [statusBulletString, badgeTitleString].filter(Boolean).join(' ');
 };
+
+const getTrayIconTooltip = ({ badge: { count } }) => i18n.pluralize('Message_count', count, count);
 
 const createContextMenuTemplate = ({ isMainWindowVisible }, events) => ([
 	{
@@ -75,6 +52,8 @@ class Tray extends EventEmitter {
 		};
 
 		this.trayIcon = null;
+
+		this.images = {};
 	}
 
 	setState(partialState) {
@@ -85,9 +64,35 @@ class Tray extends EventEmitter {
 		this.update();
 	}
 
+	getIconImage() {
+		const { title, count, showAlert } = this.state.badge;
+
+		if (title === '•') {
+			return this.images.dot;
+		}
+
+		if (count > 0) {
+			return this.images[count > 9 ? '9plus' : String(count)];
+		}
+
+		if (showAlert) {
+			return this.images.alert;
+		}
+
+		return this.images[process.platform === 'darwin' ? 'template' : 'normal'];
+	}
+
+	setIconImage(name, dataUrl) {
+		this.images[name] = nativeImage.createFromDataURL(dataUrl);
+	}
+
 	createTrayIcon() {
-		this.trayIcon = new TrayIcon(getTrayIconPath(this.state));
-		this.trayIcon.setToolTip(app.getName());
+		if (this.trayIcon) {
+			return;
+		}
+
+		this.trayIcon = new TrayIcon(this.getIconImage());
+		this.trayIcon.setToolTip(getTrayIconTooltip(this.state));
 
 		this.trayIcon.on('click', () => this.emit('set-main-window-visibility', !this.state.isMainWindowVisible));
 		this.trayIcon.on('right-click', (event, bounds) => this.trayIcon.popUpContextMenu(undefined, bounds));
@@ -124,11 +129,13 @@ class Tray extends EventEmitter {
 			return;
 		}
 
+		this.trayIcon.setImage(this.getIconImage());
+
 		if (process.platform === 'darwin') {
 			this.trayIcon.setTitle(getTrayIconTitle(this.state));
 		}
 
-		this.trayIcon.setImage(getTrayIconPath(this.state));
+		this.trayIcon.setToolTip(getTrayIconTooltip(this.state));
 
 		const template = createContextMenuTemplate(this.state, this);
 		const menu = Menu.buildFromTemplate(template);
