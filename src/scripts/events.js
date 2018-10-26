@@ -147,7 +147,8 @@ export default async() => {
 		const mainWindow = getCurrentWindow();
 
 		menus.setState({
-			showTrayIcon: localStorage.getItem('hideTray') !== 'true',
+			showTrayIcon: localStorage.getItem('hideTray') ?
+				localStorage.getItem('hideTray') !== 'true' : (process.platform !== 'linux'),
 			showUserStatusInTray: (localStorage.getItem('showUserStatusInTray') || 'true') === 'true',
 			showFullScreen: mainWindow.isFullScreen(),
 			showWindowOnUnreadChanged: localStorage.getItem('showWindowOnUnreadChanged') === 'true',
@@ -156,7 +157,8 @@ export default async() => {
 		});
 
 		tray.setState({
-			showIcon: localStorage.getItem('hideTray') !== 'true',
+			showIcon: localStorage.getItem('hideTray') ?
+				localStorage.getItem('hideTray') !== 'true' : (process.platform !== 'linux'),
 			showUserStatus: (localStorage.getItem('showUserStatusInTray') || 'true') === 'true',
 		});
 	};
